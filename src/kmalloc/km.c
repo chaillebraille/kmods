@@ -12,14 +12,54 @@ struct memlst
 	struct memlst* nxt;
 };
 
+static int find_max_order(struct memlst** list)
+{
+	void* mem;
+	int order;
+
+	for (order = 25; order > 17; --order)
+	{
+		mem = kmalloc(1UL << order, GFP_KERNEL);
+		if (mem)
+		{
+			*list = kmalloc(sizeof(struct memlst), GFP_KERNEL);
+			if (!*list)
+			{
+				kfree(mem);
+				return -1;
+			}
+			(*list)->nxt = NULL;
+			(*list)->mem = mem;
+			return order;
+		}
+	}
+	return 0;
+}
+
 static struct memlst* allocate(void)
 {
 	struct memlst* list = NULL;
 	struct memlst* node;
 	void* mem = NULL;
 	unsigned int cnt = 0;
+	int order;
 
-	while ((mem = kmalloc(1 << 24, GFP_KERNEL)))
+	order = find_max_order(&list);
+
+	if (order < 0)
+	{
+		printk(KERN_INFO "Module km hit an error in finding maximum allocation order.");
+		return list;
+	}
+	if (!order)
+	{
+		printk(KERN_INFO "Module km failed in finding the maximum allocation order.");
+		return list;
+	}
+
+	printk(KERN_INFO "Module km attempting to allocate areas of size %ldKB.", 1UL << (order-10));
+
+	while ((mem = kmalloc(1UL << order, GFP_KERNEL)))
 	{
 		++cnt;
 		node = kmalloc(sizeof(struct memlst), GFP_KERNEL);
@@ -33,7 +73,7 @@ static struct memlst* allocate(void)
 		list = node;
 	}
 
-	printk(KERN_INFO "Module km allocated %d large areas.\n", cnt);
+	printk(KERN_INFO "Module km allocated %d areas, a total of %ldMB.\n", cnt, (cnt * (1UL << (order)) >> 20));
 
 	return list;
 }
