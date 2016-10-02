@@ -2,15 +2,15 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 
-MODULE_LICENSE("GPL")
-MODULE_AUTHOR("John Doe")
-MODULE_DESCRIPTION("Module for testing kmalloc")
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("John Doe");
+MODULE_DESCRIPTION("Module for testing kmalloc");
 
 struct memlst
 {
 	void* mem;
 	struct memlst* nxt;
-}
+};
 
 static struct memlst* allocate(void)
 {
@@ -19,10 +19,10 @@ static struct memlst* allocate(void)
 	void* mem = NULL;
 	unsigned int cnt = 0;
 
-	while (mem = kmalloc(1 << 24, GFP_KERNEL))
+	while ((mem = kmalloc(1 << 24, GFP_KERNEL)))
 	{
 		++cnt;
-		node = kmalloc(sizeof(struct memlst), GFP_KERNEL)
+		node = kmalloc(sizeof(struct memlst), GFP_KERNEL);
 		if (!node)
 		{
 			kfree(mem);
@@ -51,11 +51,11 @@ static void deallocate(struct memlst* list)
 	}
 }
 
-static int init_module(void)
+static int init_km(void)
 {
 	struct memlst* list;
 
-	list = allocated();
+	list = allocate();
 	deallocate(list);
 
 	printk(KERN_INFO "Module km initialized.\n");
@@ -63,11 +63,11 @@ static int init_module(void)
 	return 0;
 }
 
-static void cleanup_module(void)
+static void exit_km(void)
 {
 	printk(KERN_INFO "Module km cleaned up.\n");
 }
 
-module_init(init_module)
-module_exit(cleanup_module)
+module_init(init_km)
+module_exit(exit_km)
 
