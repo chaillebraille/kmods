@@ -19,11 +19,20 @@ static int find_max_order(struct memlst** list)
 	unsigned long mem;
 	int order;
 
-	for (order = 35; order > 17; --order)
+	printk(KERN_INFO "Module 'get' is auto-detecting maximum allocation order.");
+	for (order = 30; order > 0; --order)
 	{
 		mem = __get_free_pages(GFP_KERNEL, 1UL << order);
 		if (mem)
 		{
+			if (order > 10)
+			{
+				printk(KERN_INFO "Module 'get' detected maximum order to be %d, corresponding to %ldKB", order, (1UL << (order-10)));
+			}
+			else
+			{
+				printk(KERN_INFO "Module 'get' detected maximum order to be %d, corresponding to %ldB", order, (1UL << order));
+			}
 			*list = kmalloc(sizeof(struct memlst), GFP_KERNEL);
 			if (!*list)
 			{
@@ -46,6 +55,7 @@ static struct memlst* allocate(void)
 	unsigned long mem = 0;
 	unsigned int cnt = 1;
 	int order;
+	unsigned long sz;
 
 	order = find_max_order(&list);
 
@@ -60,7 +70,13 @@ static struct memlst* allocate(void)
 		return list;
 	}
 
-	printk(KERN_INFO "Module 'get' attempting to allocate areas of size %ldKB.", 1UL << (order-10));
+	if (order > 10)
+	{
+		printk(KERN_INFO "Module 'get' attempting to allocate areas of size %ldKB.", 1UL << (order-10));	}
+	else
+	{
+		printk(KERN_INFO "Module 'get' attempting to allocate areas of size %ldB.", 1UL << order);
+	}
 
 	while ((mem = __get_free_pages(GFP_KERNEL, order)))
 	{
@@ -77,7 +93,19 @@ static struct memlst* allocate(void)
 		list = node;
 	}
 
-	printk(KERN_INFO "Module 'get' allocated %d areas, a total of %ldMB.\n", cnt, (cnt * (1UL << (order)) >> 20));
+	sz = cnt * (1UL << order);
+	if (sz > (1UL << 30))
+	{
+		printk(KERN_INFO "Module 'get' allocated %d areas, a total of %ldMB.\n", cnt, (sz >> 20));
+	}
+	else if (sz > (1UL << 20))
+	{
+		printk(KERN_INFO "Module 'get' allocated %d areas, a total of %ldKB.\n", cnt, (sz >> 10));
+	}
+	else
+	{
+		printk(KERN_INFO "Module 'get' allocated %d areas, a total of %ldB.\n", cnt, sz);
+	}
 
 	return list;
 }
@@ -86,6 +114,7 @@ static void deallocate(struct memlst* list)
 {
 	struct memlst* node;
 
+	printk(KERN_INFO "Module 'get' deallocating.\n");
 	while (list)
 	{
 		node = list;
@@ -93,12 +122,16 @@ static void deallocate(struct memlst* list)
 		free_pages(node->mem, node->order);
 		kfree(node);
 	}
+
+	return;
 }
 
 static int init_get(void)
 {
-	struct memlst* list;
+	struct memlst* list = NULL;
 
+	find_max_order(&list);
+	deallocate(list);
 	list = allocate();
 	deallocate(list);
 	list = allocate();
