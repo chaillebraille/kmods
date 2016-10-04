@@ -77,7 +77,7 @@ static struct memlst* allocate(void)
 		list = node;
 	}
 
-	printk(KERN_INFO "Module km allocated %d areas, a total of %ldMB.\n", cnt, (cnt * (1UL << (order)) >> 20));
+	printk(KERN_INFO "Module 'get' allocated %d areas, a total of %ldMB.\n", cnt, (cnt * (1UL << (order)) >> 20));
 
 	return list;
 }
@@ -101,15 +101,19 @@ static int init_get(void)
 
 	list = allocate();
 	deallocate(list);
+	list = allocate();
+	deallocate(list);
+	list = allocate();
+	deallocate(list);
 
-	printk(KERN_INFO "Module get initialized.\n");
+	printk(KERN_INFO "Module 'get' initialized.\n");
 
 	return 0;
 }
 
 static void exit_get(void)
 {
-	printk(KERN_INFO "Module get cleaned up.\n");
+	printk(KERN_INFO "Module 'get' cleaned up.\n");
 }
 
 module_init(init_get)
