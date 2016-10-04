@@ -95,6 +95,8 @@ static struct memlst* allocate(void)
 		node->order = order;
 		node->nxt = list;
 		list = node;
+
+		if (cnt >= 10) break;
 	}
 
 	sz = cnt * (1UL << shift);
