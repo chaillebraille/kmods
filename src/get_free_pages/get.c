@@ -1,6 +1,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
-// #include <linux/slab.h>
+#include <linux/slab.h>
 #include <linux/gfp.h>
 
 MODULE_LICENSE("GPL");
@@ -43,8 +43,8 @@ static struct memlst* allocate(void)
 {
 	struct memlst* list = NULL;
 	struct memlst* node;
-	void* mem = NULL;
-	unsigned int cnt = 0;
+	unsigned long mem = 0;
+	unsigned int cnt = 1;
 	int order;
 
 	order = find_max_order(&list);
@@ -82,7 +82,7 @@ static struct memlst* allocate(void)
 	return list;
 }
 
-static void deallocate(struct memlst* list, int order)
+static void deallocate(struct memlst* list)
 {
 	struct memlst* node;
 
