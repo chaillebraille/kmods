@@ -8,6 +8,8 @@
 #include <asm/page.h>
 #include <linux/errno.h>
 
+#include "rsvdmem.h"
+
 MODULE_LICENSE("GPL");
 
 #define DEVICE_NAME "rsvdmem"
