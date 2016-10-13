@@ -9,6 +9,7 @@
 #include <linux/errno.h>
 
 #include "rsvdmem.h"
+#include "cmalloc.h"
 
 MODULE_LICENSE("GPL");
 
@@ -18,6 +19,7 @@ MODULE_LICENSE("GPL");
 
 static int majorNumber = -1;
 static void* kmemBase = 0;
+static void* cmallocHdl = 0;
 static struct class* devClass = 0;
 static struct device* rmemDev = 0;
 
@@ -59,6 +61,9 @@ static int rsvdmem_mmap(struct file* filp, struct vm_area_struct* vma)
    }
 }
 
+static ssize_t rsvdmem_write(struct file* filp, const char __user * data, size_t size, loff_t* wtf);
+static ssize_t rsvdmem_read(struct file* filp, char __user * data, size_t size, loff_t* wtf);
+
 static struct file_operations fops =
 {
    .owner = THIS_MODULE,
@@ -91,6 +96,13 @@ static int __init rsvdmem_init(void)
    if (!kmemBase)
    {
       printk(KERN_ALERT "rsvdmem: Unable to ioremap reserved memory.\n");
+      return -EFAULT;
+   }
+
+   cmallocHdl = cmalloc_init(mem_base, mem_size);
+   if (!cmallocHdl)
+   {
+      printk(KERN_ALERT "rsvdmem: Unable to ceate contiguous memory allocator.\n");
       return -EFAULT;
    }
 
@@ -129,6 +141,7 @@ static void __exit rsvdmem_exit(void)
    class_unregister(devClass);
    class_destroy(devClass);
    unregister_chrdev(majorNumber, DEVICE_NAME);
+   cmalloc_close(cmallocHdl);
    if (kmemBase)
    {
       iounmap(kmemBase);
