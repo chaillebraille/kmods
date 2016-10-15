@@ -1,63 +1,67 @@
 #include <linux/slab.h>
 #include <linux/cache.h>
-#include "cmalloc.h"
+#include "relmalloc.h"
 
 static unsigned int cache_width;
 
-struct cmalloc_hdl
+struct relmalloc_hdl
 {
-   unsigned long base;
+   unsigned int offset;
    unsigned long size;
    unsigned long last;
 };
 
-void* cmalloc_init(unsigned long base, unsigned long size)
+void* relmalloc_init(unsigned long base, unsigned long size)
 {
    void* mem
    unsigned int misalign;
-   struct cmalloc_hdl* hdl;
-
-   mem = kmalloc(size_of(struct cmalloc_hdl));
-   if (!mem) return 0;
+   struct relmalloc_hdl* hdl;
 
    cache_width = cache_line_size();
    misalign = base % cache_width;
    if (misalign)
    {
-      base += (cache_width - misalign);
+      misalign = cache_width - misalign;
+      if (misalign >= size) return 0;
+      size -= misalign;
    }
 
-   hdl = (struct cmalloc_hdl*)mem;
-   hdl->base = base;
-   hdl->end = base + size;
-   hdl->last = hdl->end;
+   mem = kmalloc(size_of(struct relmalloc_hdl));
+   if (!mem) return 0;
+
+   hdl = (struct relmalloc_hdl*)mem;
+   hdl->offset = misalign;
+   hdl->size = size;
+   hdl->last = size;
 
    return hdl;
 }
 
-void cmalloc_close(void* hdl)
+void relmalloc_close(void* hdl)
 {
    kfree(hdl);
 }
 
-unsigned long cmalloc_get(void* raw, size_t size)
+unsigned long relmalloc_get(void* rhdl, size_t size)
 {
-   struct cmalloc_hdl* hdl;
-   unsigned long addr;
+   struct relmalloc_hdl* hdl;
+   unsigned long reladdr;
    unsigned int misalign;
 
-   hdl = (struct cmalloc_hdl*)raw;
+   hdl = (struct relmalloc_hdl*)rhdl;
 
-   if (hdl->base + size >= hdl->last) hdl->last = hdl->end;
-   addr = hdl->last - size;
-   misalign = (addr % cache_width);
-   addr -= misalign;
-   memset(addr, 0, size);
-   hdl->last = addr;
-   return addr;
+   // Ignore size > hdl->size for now
+   if (size >= hdl->last) hdl->last = hdl->size;
+   reladdr = hdl->last - size;
+   misalign = (reladdr % cache_width);
+   reladdr -= misalign;
+   reladdr += hdl->offset;
+   // memset(base + reladdr, 0, size);
+   hdl->last = reladdr;
+   return reladdr;
 }
 
-void cmalloc_free(void* raw, unsigned long addr)
+void relmalloc_free(void* raw, unsigned long addr)
 {
 }
 
