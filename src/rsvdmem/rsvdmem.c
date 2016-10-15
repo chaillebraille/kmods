@@ -6,10 +6,11 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <asm/page.h>
+#include <asm/uaccess.h>
 #include <linux/errno.h>
 
 #include "rsvdmem.h"
-#include "cmalloc.h"
+#include "relmalloc.h"
 
 MODULE_LICENSE("GPL");
 
@@ -19,12 +20,14 @@ MODULE_LICENSE("GPL");
 
 static int majorNumber = -1;
 static void* kmemBase = 0;
-static void* cmallocHdl = 0;
+static void* relmallocHdl = 0;
 static struct class* devClass = 0;
 static struct device* rmemDev = 0;
 
 static unsigned long mem_base = 0;
 static unsigned long mem_size = 0;
+
+static unsigned long relmalloc_buff;
 
 MODULE_PARM(mem_base, "l");
 MODULE_PARM(mem_sizes, "l");
@@ -61,13 +64,48 @@ static int rsvdmem_mmap(struct file* filp, struct vm_area_struct* vma)
    }
 }
 
-static ssize_t rsvdmem_write(struct file* filp, const char __user * data, size_t size, loff_t* wtf);
-static ssize_t rsvdmem_read(struct file* filp, char __user * data, size_t size, loff_t* wtf);
+static ssize_t rsvdmem_write(struct file* filp, const char __user * data, size_t size, loff_t* offset)
+{
+   struct rsvdmem_buffref buffref;
+   unsigned long lres;
+   unsigned long raddr;
+
+   if (size != sizeof(struct rsvdmem_buffref)) return -EFAULT;
+   lres = copy_from_user(&buffref, data, size);
+   if (lres != size) return -EFAULT;
+   raddr = relmalloc_get(relmallocHdl, buffref.size);
+   lres = copy_from_user(kmemBase+raddr, buffref.buffer, buffref.size);
+   if (lres != buffref.size)
+   {
+      relmalloc_free(relmallocHdl, raddr);
+      return -EFAULT;
+   }
+   relmalloc_buff = raddr;
+   ++(*offset);
+   return lres;
+}
+
+static ssize_t rsvdmem_read(struct file* filp, char __user * data, size_t size, loff_t* wtf)
+{
+   struct rsvdmem_buffref buffref;
+   unsigned long lres;
+
+   if (size != sizeof(struct rsvdmem_buffref)) return -EFAIL;
+   lres = copy_from_user(&buffref, data, size);
+   if (lres != size) return -EFAULT;
+   lres = copy_to_user(buffref.buffer, kmemBase + relmalloc_buff, buffref.size);
+   if (lres != buffref.size) return -EFAULT;
+   relmalloc_free(relmallocHdl, relmalloc_buff);
+   ++(*offset);
+   return lres;
+}
 
 static struct file_operations fops =
 {
    .owner = THIS_MODULE,
    .open = rsvdmem_open,
+   .read = rsvdmem_read,
+   .write = rsvdmem_write,
    .release = rsvdmem_release,
    .mmap = rsvdmem_mmap
 };
@@ -99,8 +137,8 @@ static int __init rsvdmem_init(void)
       return -EFAULT;
    }
 
-   cmallocHdl = cmalloc_init(mem_base, mem_size);
-   if (!cmallocHdl)
+   relmallocHdl = relmalloc_init(mem_base, mem_size);
+   if (!relmallocHdl)
    {
       printk(KERN_ALERT "rsvdmem: Unable to ceate contiguous memory allocator.\n");
       return -EFAULT;
@@ -141,7 +179,7 @@ static void __exit rsvdmem_exit(void)
    class_unregister(devClass);
    class_destroy(devClass);
    unregister_chrdev(majorNumber, DEVICE_NAME);
-   cmalloc_close(cmallocHdl);
+   relmalloc_close(relmallocHdl);
    if (kmemBase)
    {
       iounmap(kmemBase);

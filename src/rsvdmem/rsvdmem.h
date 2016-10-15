@@ -3,7 +3,9 @@
 
 struct rsvdmem_buffref
 {
-	void* buffer;
+   void* buffer;
+   size_t size;
+
 };
 
 #endif /* RSDVMEM_H_INCLUDED */
