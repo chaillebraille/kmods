@@ -4,7 +4,9 @@
 #include <linux/jiffies.h>
 #include <linux/timer.h>
 #include <linux/module.h>
-// #include <linux/interrupt.h>
+// For tasklets #include <linux/interrupt.h>
+// New WQ implementation 2010: cmwq - Concurrency Managed WQ
+// For work-queues #include <linux/workqueue.h>
 // #include <linux/init.h>
 // #include <linux/kernel.h>
 
@@ -37,9 +39,20 @@ struct tasklet_struct tasklet_data;
 
 static void tasklet_fn(unsigned long)
 {
+   void* the_data;
+
+   if (workq_is_to_run)
+   {
+      INIT_WORK(&some_work, worker_fn, the_data);
+      // PREPARE_WORK(&some_work, worker_fn, the_data);
+
+      ret = queue_work(&workQ, &some_work);
+   }
 }
 
-static void worker_fn(void)
+struct work_struct some_work;
+
+static void worker_fn(unsigned long)
 {
 }
 
@@ -47,8 +60,12 @@ static int __init init_mod(void)
 {
    unsigned long delay = HZ;
    struct timer_list* timer;
+   struct workqueue_struct* workQ;
 
    printk(KERN_INFO "Initializing module");
+
+   printk(KERN_INFO "Initializing work-queue");
+   workQ = alloc_workqueue("theworkq", WQ_UNBOUND, 1);
 
    printk(KERN_INFO "Initializing tasklet");
    tasklet_init(&tasklet_data, tasklet_fn, &tasklet_data);
@@ -61,6 +78,7 @@ static int __init init_mod(void)
    irq_timer.other_data = 4711;
 
    printk(KERN_INFO "Adding timer");
+   set_workq_is_to_run();
    set_tasklet_is_to_run();
    set_timer_is_to_run();
    add_timer(timer);
@@ -77,8 +95,11 @@ static void __exit cleanup_mod(void)
    printk(KERN_INFO "Deleting timer");
    unset_timer_is_to_run();
    unset_tasklet_is_to_run();
+   unset_workq_is_to_run();
    del_timer_sync(&irq_timer.timer);
    tasklet_kill(&tasklet_data);
+   flush_workqueue(&workQ);
+   destroy_workqueue(&workQ);
 
    printk(KERN_INFO "Module released");
 }
