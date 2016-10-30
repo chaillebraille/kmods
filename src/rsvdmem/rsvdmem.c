@@ -1,6 +1,6 @@
 #include <linux/module.h>
 #include <linux/device.h>
-#include <linus/init.h>
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/fs.h>
